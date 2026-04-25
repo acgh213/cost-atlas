@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vesper · Cost Atlas</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { font-size: 14px; }
+body {
+  background: #0a0a0f;
+  color: #d4c8b8;
+  font-family: Georgia, 'Times New Roman', serif;
+  min-height: 100vh;
+  padding: 2rem 1.5rem;
+}
+.container { max-width: 1440px; margin: 0 auto; }
+
+/* Header */
+header { text-align: center; margin-bottom: 2.5rem; }
+h1 {
+  font-size: 2.2rem; font-weight: 400; letter-spacing: 0.06em;
+  color: #d4a574; margin-bottom: 0.2rem;
+}
+.subtitle {
+  font-size: 0.95rem; color: #9b8ec4; letter-spacing: 0.12em;
+  font-style: italic; opacity: 0.7;
+}
+.header-line {
+  width: 60px; height: 1px; background: rgba(212,165,116,0.2);
+  margin: 0.6rem auto 0;
+}
+
+/* Grid */
+.grid { display: grid; gap: 1.2rem; }
+.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.cols-2 { grid-template-columns: 1fr 1fr; }
+.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.cols-1-2 { grid-template-columns: 1fr 2fr; }
+
+/* Cards */
+.card {
+  background: rgba(10,10,15,0.8);
+  border: 1px solid rgba(212,165,116,0.08);
+  border-radius: 8px;
+  padding: 1.2rem 1.4rem;
+  transition: border-color 0.3s;
+}
+.card:hover { border-color: rgba(212,165,116,0.18); }
+.card-header {
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em;
+  color: #9b8ec4; margin-bottom: 0.5rem; font-style: italic;
+}
+.card-value {
+  font-size: 1.8rem; color: #d4a574; font-weight: 400; line-height: 1.1;
+}
+.card-sub {
+  font-size: 0.8rem; color: rgba(212,165,116,0.5); margin-top: 0.15rem;
+}
+.card-chart { padding: 0.8rem 0.6rem 0.3rem; }
+
+/* Big number card variants */
+.card-spend .card-value { color: #d4a574; }
+.card-tokens .card-value { color: #9b8ec4; }
+.card-sessions .card-value { color: #c48b8b; }
+
+/* Table */
+.table-wrap { overflow-x: auto; }
+table {
+  width: 100%; border-collapse: collapse; font-size: 0.82rem;
+}
+thead th {
+  text-align: left; padding: 0.5rem 0.6rem;
+  color: #9b8ec4; font-weight: 400; font-style: italic;
+  border-bottom: 1px solid rgba(212,165,116,0.08);
+  cursor: pointer; user-select: none; white-space: nowrap;
+}
+thead th:hover { color: #d4a574; }
+thead th::after { content: ' ▾'; opacity: 0.3; font-size: 0.65rem; }
+thead th.asc::after { content: ' ▴'; opacity: 1; color: #d4a574; }
+thead th.desc::after { content: ' ▾'; opacity: 1; color: #d4a574; }
+tbody td {
+  padding: 0.4rem 0.6rem; border-bottom: 1px solid rgba(212,165,116,0.04);
+  white-space: nowrap;
+}
+tbody tr:hover { background: rgba(212,165,116,0.03); }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.model-name { color: #d4a574; }
+td.source-name { color: #9b8ec4; font-size: 0.75rem; }
+
+/* Heatmap */
+.heatmap-wrap { overflow-x: auto; }
+.heatmap-table { font-size: 0.7rem; min-width: 600px; }
+.heatmap-table td {
+  width: 32px; height: 28px; text-align: center; padding: 0;
+  border: 1px solid rgba(212,165,116,0.04);
+  font-size: 0.6rem; color: rgba(255,255,255,0.3);
+}
+.heatmap-table th {
+  text-align: center; padding: 0.3rem 0.2rem;
+  color: #9b8ec4; font-weight: 400; font-style: italic; font-size: 0.65rem;
+}
+.heatmap-table .day-label {
+  text-align: right; padding-right: 0.5rem;
+  font-style: normal; color: #9b8ec4; font-size: 0.65rem;
+}
+.heatmap-cell { border-radius: 2px; transition: opacity 0.2s; }
+.heatmap-cell:hover { opacity: 0.85; transform: scale(1.1); }
+
+/* Section title */
+.section-title {
+  font-size: 0.9rem; color: #d4a574; letter-spacing: 0.08em;
+  margin-bottom: 0.8rem; font-style: italic; font-weight: 400;
+}
+.section-title span { color: #9b8ec4; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .cols-4 { grid-template-columns: repeat(2, 1fr); }
+  .cols-2 { grid-template-columns: 1fr; }
+  .cols-3 { grid-template-columns: 1fr; }
+  .cols-1-2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 500px) {
+  .cols-4 { grid-template-columns: 1fr; }
+  body { padding: 1rem; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Vesper · Cost Atlas</h1>
+  <div class="subtitle">Where the tokens go</div>
+  <div class="header-line"></div>
+</header>
+
+<!-- Cost Overview -->
+<div class="grid cols-4" id="overview-grid" style="margin-bottom: 1.2rem;"></div>
+
+<!-- Daily Cost Stacked Bar + Source Breakdown -->
+<div class="grid cols-1-2" style="margin-bottom: 1.2rem;">
+  <div class="card card-chart">
+    <div class="section-title">Source <span>Breakdown</span></div>
+    <canvas id="sourceChart" height="240"></canvas>
+  </div>
+  <div class="card card-chart">
+    <div class="section-title">Daily Cost <span>by Model</span></div>
+    <canvas id="dailyChart" height="200"></canvas>
+  </div>
+</div>
+
+<!-- Token Usage by Model -->
+<div class="grid cols-2" style="margin-bottom: 1.2rem;">
+  <div class="card card-chart">
+    <div class="section-title">Token Usage <span>by Model</span></div>
+    <canvas id="tokenChart" height="250"></canvas>
+  </div>
+  <div class="card card-chart">
+    <div class="section-title">Activity <span>Heatmap</span></div>
+    <div id="heatmapContainer"></div>
+  </div>
+</div>
+
+<!-- Model Comparison Table -->
+<div class="card" style="margin-bottom: 1.2rem;">
+  <div class="section-title">Model <span>Comparison</span></div>
+  <div class="table-wrap">
+    <table id="modelTable">
+      <thead></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+</div>
+
+<script>
+// ── Raw Data from SQL ──────────────────────────────────────────────
+const SUMMARY_DATA = [
+  {"model":"mimo-v2-omni","source":"telegram","sessions":4,"input_tok":1429415,"output_tok":118403,"cache_read":16169376,"cost":0.9980991916,"tools":253},
+  {"model":"moonshotai/kimi-k2.6","source":"telegram","sessions":4,"input_tok":680934,"output_tok":59806,"cache_read":10955472,"cost":0.6507740564,"tools":173},
+  {"model":"xiaomi/mimo-v2-pro","source":"cron","sessions":19,"input_tok":559833,"output_tok":42863,"cache_read":2460032,"cost":0.2373326,"tools":212},
+  {"model":"deepseek/deepseek-v4-flash","source":"cron","sessions":7,"input_tok":1424822,"output_tok":12883,"cache_read":540160,"cost":0.2182068,"tools":64},
+  {"model":"deepseek/deepseek-v4-flash","source":"telegram","sessions":32,"input_tok":602044,"output_tok":103351,"cache_read":2050432,"cost":0.170636536,"tools":309},
+  {"model":"moonshotai/kimi-k2.6","source":"cron","sessions":9,"input_tok":23840,"output_tok":2528,"cache_read":184160,"cost":0.05646648,"tools":9},
+  {"model":"moonshotai/kimi-k2.6","source":"tui","sessions":2,"input_tok":12560,"output_tok":1197,"cache_read":108288,"cost":0.0307692574,"tools":9},
+  {"model":"openai/gpt-5-nano","source":"cron","sessions":6,"input_tok":152509,"output_tok":46264,"cache_read":367488,"cost":0.02980593,"tools":30},
+  {"model":"gpt-5.4","source":"cron","sessions":2,"input_tok":388764,"output_tok":5245,"cache_read":63104,"cost":0,"tools":43},
+  {"model":"gpt-5.4","source":"telegram","sessions":1,"input_tok":2412532,"output_tok":23296,"cache_read":236032,"cost":0,"tools":62},
+  {"model":"mimo-v2-omni","source":"cron","sessions":8,"input_tok":28074,"output_tok":1269,"cache_read":178304,"cost":0,"tools":8},
+  {"model":"mimo-v2.5","source":"cron","sessions":3,"input_tok":26940,"output_tok":3010,"cache_read":315008,"cost":0,"tools":20},
+  {"model":"mimo-v2.5","source":"telegram","sessions":5,"input_tok":817780,"output_tok":122918,"cache_read":43582784,"cost":0,"tools":280},
+  {"model":"xiaomi/mimo-v2-pro","source":"telegram","sessions":15,"input_tok":3213393,"output_tok":234470,"cache_read":46180928,"cost":0,"tools":475},
+  {"model":"gemini-2.5-flash","source":"cli","sessions":1,"input_tok":0,"output_tok":0,"cache_read":0,"cost":null,"tools":0},
+  {"model":"gemini-2.5-flash","source":"telegram","sessions":3,"input_tok":0,"output_tok":0,"cache_read":0,"cost":null,"tools":8},
+  {"model":"mimo-v2-omni","source":"tui","sessions":1,"input_tok":0,"output_tok":0,"cache_read":0,"cost":null,"tools":0}
+];
+
+const DAILY_DATA = [
+  {"day":"2026-04-20","model":"xiaomi/mimo-v2-pro","source":"cron","sessions":5,"input_tok":168162,"output_tok":13073,"cost":0},
+  {"day":"2026-04-20","model":"xiaomi/mimo-v2-pro","source":"telegram","sessions":14,"input_tok":2774539,"output_tok":207979,"cost":0},
+  {"day":"2026-04-21","model":"xiaomi/mimo-v2-pro","source":"cron","sessions":8,"input_tok":244090,"output_tok":18729,"cost":0},
+  {"day":"2026-04-21","model":"xiaomi/mimo-v2-pro","source":"telegram","sessions":1,"input_tok":438854,"output_tok":26491,"cost":0},
+  {"day":"2026-04-22","model":"gpt-5.4","source":"cron","sessions":2,"input_tok":388764,"output_tok":5245,"cost":0},
+  {"day":"2026-04-22","model":"gpt-5.4","source":"telegram","sessions":1,"input_tok":2412532,"output_tok":23296,"cost":0},
+  {"day":"2026-04-22","model":"mimo-v2-omni","source":"telegram","sessions":1,"input_tok":209207,"output_tok":38167,"cost":0},
+  {"day":"2026-04-22","model":"xiaomi/mimo-v2-pro","source":"cron","sessions":6,"input_tok":147581,"output_tok":11061,"cost":0.2373326},
+  {"day":"2026-04-23","model":"mimo-v2-omni","source":"cron","sessions":8,"input_tok":28074,"output_tok":1269,"cost":0},
+  {"day":"2026-04-23","model":"mimo-v2-omni","source":"telegram","sessions":3,"input_tok":1220208,"output_tok":80236,"cost":0.9980991916},
+  {"day":"2026-04-23","model":"mimo-v2-omni","source":"tui","sessions":1,"input_tok":0,"output_tok":0,"cost":null},
+  {"day":"2026-04-24","model":"moonshotai/kimi-k2.6","source":"cron","sessions":8,"input_tok":0,"output_tok":0,"cost":null},
+  {"day":"2026-04-24","model":"moonshotai/kimi-k2.6","source":"telegram","sessions":3,"input_tok":172109,"output_tok":25208,"cost":0.3242979698},
+  {"day":"2026-04-24","model":"moonshotai/kimi-k2.6","source":"tui","sessions":2,"input_tok":12560,"output_tok":1197,"cost":0.0307692574},
+  {"day":"2026-04-24","model":"gemini-2.5-flash","source":"cli","sessions":1,"input_tok":0,"output_tok":0,"cost":null},
+  {"day":"2026-04-25","model":"deepseek/deepseek-v4-flash","source":"cron","sessions":7,"input_tok":1424822,"output_tok":12883,"cost":0.2182068},
+  {"day":"2026-04-25","model":"deepseek/deepseek-v4-flash","source":"telegram","sessions":32,"input_tok":604188,"output_tok":103666,"cost":0.17115392},
+  {"day":"2026-04-25","model":"gemini-2.5-flash","source":"telegram","sessions":3,"input_tok":0,"output_tok":0,"cost":null},
+  {"day":"2026-04-25","model":"mimo-v2.5","source":"cron","sessions":3,"input_tok":26940,"output_tok":3010,"cost":0},
+  {"day":"2026-04-25","model":"mimo-v2.5","source":"telegram","sessions":5,"input_tok":817780,"output_tok":122918,"cost":0},
+  {"day":"2026-04-25","model":"moonshotai/kimi-k2.6","source":"cron","sessions":1,"input_tok":23840,"output_tok":2528,"cost":0.05646648},
+  {"day":"2026-04-25","model":"moonshotai/kimi-k2.6","source":"telegram","sessions":1,"input_tok":508825,"output_tok":34598,"cost":0.3264760866},
+  {"day":"2026-04-25","model":"openai/gpt-5-nano","source":"cron","sessions":6,"input_tok":152509,"output_tok":46264,"cost":0.02980593}
+];
+
+const HOURLY_DATA = [
+  {"hour":"00","sessions":5,"tokens":654561},
+  {"hour":"01","sessions":2,"tokens":23840},
+  {"hour":"02","sessions":1,"tokens":76973},
+  {"hour":"04","sessions":8,"tokens":360030},
+  {"hour":"07","sessions":2,"tokens":541002},
+  {"hour":"09","sessions":3,"tokens":57201},
+  {"hour":"10","sessions":1,"tokens":74893},
+  {"hour":"11","sessions":1,"tokens":544705},
+  {"hour":"12","sessions":2,"tokens":244441},
+  {"hour":"13","sessions":11,"tokens":495926},
+  {"hour":"14","sessions":4,"tokens":22280},
+  {"hour":"15","sessions":11,"tokens":192726},
+  {"hour":"16","sessions":6,"tokens":125327},
+  {"hour":"17","sessions":4,"tokens":110691},
+  {"hour":"18","sessions":3,"tokens":15623},
+  {"hour":"19","sessions":4,"tokens":95658},
+  {"hour":"22","sessions":1,"tokens":0},
+  {"hour":"23","sessions":5,"tokens":107696}
+];
+
+const HEATMAP_DATA = [
+  {"day_of_week":"1","hour":"01","sessions":1,"tokens":15640},
+  {"day_of_week":"1","hour":"04","sessions":1,"tokens":2371071},
+  {"day_of_week":"1","hour":"09","sessions":1,"tokens":38994},
+  {"day_of_week":"1","hour":"11","sessions":1,"tokens":25985},
+  {"day_of_week":"1","hour":"13","sessions":2,"tokens":51799},
+  {"day_of_week":"1","hour":"14","sessions":3,"tokens":68047},
+  {"day_of_week":"1","hour":"15","sessions":1,"tokens":55399},
+  {"day_of_week":"1","hour":"17","sessions":1,"tokens":45239},
+  {"day_of_week":"1","hour":"18","sessions":1,"tokens":37614},
+  {"day_of_week":"1","hour":"20","sessions":1,"tokens":34283},
+  {"day_of_week":"1","hour":"21","sessions":5,"tokens":129058},
+  {"day_of_week":"1","hour":"22","sessions":1,"tokens":69572},
+  {"day_of_week":"2","hour":"01","sessions":1,"tokens":19037},
+  {"day_of_week":"2","hour":"07","sessions":1,"tokens":34123},
+  {"day_of_week":"2","hour":"09","sessions":2,"tokens":73751},
+  {"day_of_week":"2","hour":"12","sessions":2,"tokens":459891},
+  {"day_of_week":"2","hour":"13","sessions":1,"tokens":19631},
+  {"day_of_week":"2","hour":"15","sessions":1,"tokens":54565},
+  {"day_of_week":"2","hour":"18","sessions":1,"tokens":21946},
+  {"day_of_week":"3","hour":"01","sessions":1,"tokens":34109},
+  {"day_of_week":"3","hour":"07","sessions":1,"tokens":19240},
+  {"day_of_week":"3","hour":"09","sessions":2,"tokens":48664},
+  {"day_of_week":"3","hour":"12","sessions":1,"tokens":20043},
+  {"day_of_week":"3","hour":"13","sessions":1,"tokens":25525},
+  {"day_of_week":"3","hour":"15","sessions":1,"tokens":294246},
+  {"day_of_week":"3","hour":"18","sessions":1,"tokens":94518},
+  {"day_of_week":"3","hour":"20","sessions":1,"tokens":2412532},
+  {"day_of_week":"3","hour":"23","sessions":1,"tokens":209207},
+  {"day_of_week":"4","hour":"01","sessions":2,"tokens":97990},
+  {"day_of_week":"4","hour":"04","sessions":1,"tokens":901470},
+  {"day_of_week":"4","hour":"23","sessions":1,"tokens":248822},
+  {"day_of_week":"5","hour":"02","sessions":1,"tokens":76973},
+  {"day_of_week":"5","hour":"23","sessions":3,"tokens":107696},
+  {"day_of_week":"6","hour":"00","sessions":5,"tokens":654561},
+  {"day_of_week":"6","hour":"01","sessions":1,"tokens":23840},
+  {"day_of_week":"6","hour":"04","sessions":5,"tokens":360030},
+  {"day_of_week":"6","hour":"07","sessions":1,"tokens":541002},
+  {"day_of_week":"6","hour":"09","sessions":1,"tokens":57201},
+  {"day_of_week":"6","hour":"10","sessions":1,"tokens":74893},
+  {"day_of_week":"6","hour":"11","sessions":1,"tokens":544705},
+  {"day_of_week":"6","hour":"12","sessions":1,"tokens":244441},
+  {"day_of_week":"6","hour":"13","sessions":5,"tokens":495926},
+  {"day_of_week":"6","hour":"14","sessions":1,"tokens":22280},
+  {"day_of_week":"6","hour":"15","sessions":10,"tokens":192726},
+  {"day_of_week":"6","hour":"16","sessions":6,"tokens":125327},
+  {"day_of_week":"6","hour":"17","sessions":4,"tokens":110691},
+  {"day_of_week":"6","hour":"18","sessions":2,"tokens":15623},
+  {"day_of_week":"6","hour":"19","sessions":4,"tokens":98052}
+];
+
+// ── Chart.js Global Config ─────────────────────────────────────────
+Chart.defaults.color = '#9b8ec4';
+Chart.defaults.font.family = 'Georgia, serif';
+
+const COLORS = {
+  gold: '#d4a574',
+  lavender: '#9b8ec4',
+  rose: '#c48b8b',
+  goldDim: 'rgba(212,165,116,0.5)',
+  lavenderDim: 'rgba(155,142,196,0.5)',
+  roseDim: 'rgba(196,139,139,0.5)',
+  goldBg: 'rgba(212,165,116,0.12)',
+  lavenderBg: 'rgba(155,142,196,0.12)',
+  roseBg: 'rgba(196,139,139,0.12)',
+};
+const MODEL_PALETTE = ['#d4a574','#9b8ec4','#c48b8b','#b8a48a','#a88db0','#c4a07a','#8ea4b8','#c47a7a','#d4b894','#b09ec4'];
+
+// ── Helpers ────────────────────────────────────────────────────────
+function fmt(n) { return n.toLocaleString('en-US', {maximumFractionDigits:2}); }
+function fmtMoney(n) { return '$' + (n||0).toFixed(4); }
+function fmtCompact(n) {
+  if (n >= 1e6) return (n/1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return (n/1e3).toFixed(1) + 'K';
+  return n.toString();
+}
+function safeNum(v) { return (v == null || isNaN(v)) ? 0 : v; }
+
+function aggregateByModel(data) {
+  const map = {};
+  data.forEach(d => {
+    const m = d.model || 'unknown';
+    if (!map[m]) map[m] = {model:m, sessions:0, input_tok:0, output_tok:0, cache_read:0, cost:0, tools:0, sources:new Set()};
+    map[m].sessions += d.sessions;
+    map[m].input_tok += safeNum(d.input_tok);
+    map[m].output_tok += safeNum(d.output_tok);
+    map[m].cache_read += safeNum(d.cache_read);
+    map[m].cost += safeNum(d.cost);
+    map[m].tools += safeNum(d.tools);
+    map[m].sources.add(d.source);
+  });
+  return Object.values(map).sort((a,b) => b.cost - a.cost);
+}
+
+function aggregateBySource(data) {
+  const map = {};
+  data.forEach(d => {
+    const s = d.source || 'other';
+    map[s] = (map[s]||0) + d.sessions;
+  });
+  return map;
+}
+
+function dailyByModel(flat) {
+  const days = [...new Set(flat.map(d=>d.day).filter(Boolean))].sort();
+  const models = [...new Set(flat.map(d=>d.model).filter(Boolean))].sort();
+  // Aggregate per day per model
+  const agg = {};
+  flat.forEach(d => {
+    if (!d.day || !d.model) return;
+    const key = d.day+'|'+d.model;
+    agg[key] = agg[key] || {day:d.day, model:d.model, cost:0, sessions:0, input_tok:0, output_tok:0};
+    agg[key].cost += safeNum(d.cost);
+    agg[key].sessions += d.sessions;
+    agg[key].input_tok += safeNum(d.input_tok);
+    agg[key].output_tok += safeNum(d.output_tok);
+  });
+  const rows = Object.values(agg);
+  const datasets = models.map((model, i) => {
+    const color = MODEL_PALETTE[i % MODEL_PALETTE.length];
+    return {
+      label: model,
+      data: days.map(day => {
+        const r = rows.find(x => x.day===day && x.model===model);
+        return r ? r.cost : 0;
+      }),
+      backgroundColor: color,
+      borderColor: 'transparent',
+      borderRadius: 1,
+    };
+  });
+  return { labels: days, datasets };
+}
+
+function aggregateTokenByModel(data) {
+  const map = {};
+  data.forEach(d => {
+    const m = d.model || 'unknown';
+    if (!map[m]) map[m] = {model:m, input_tok:0, output_tok:0};
+    map[m].input_tok += safeNum(d.input_tok);
+    map[m].output_tok += safeNum(d.output_tok);
+  });
+  return Object.values(map).sort((a,b) => (b.input_tok+b.output_tok) - (a.input_tok+a.output_tok));
+}
+
+// ── 1. Overview Cards ─────────────────────────────────────────────
+function buildOverview() {
+  const totalCost = SUMMARY_DATA.reduce((s,d) => s + safeNum(d.cost), 0);
+  const totalTokens = SUMMARY_DATA.reduce((s,d) => s + safeNum(d.input_tok) + safeNum(d.output_tok), 0);
+  const totalSessions = SUMMARY_DATA.reduce((s,d) => s + d.sessions, 0);
+  const totalInput = SUMMARY_DATA.reduce((s,d) => s + safeNum(d.input_tok), 0);
+  const totalOutput = SUMMARY_DATA.reduce((s,d) => s + safeNum(d.output_tok), 0);
+  const avgCost = totalSessions > 0 ? totalCost / totalSessions : 0;
+
+  const grid = document.getElementById('overview-grid');
+  grid.innerHTML = `
+    <div class="card card-spend">
+      <div class="card-header">Total Spend</div>
+      <div class="card-value">$${totalCost.toFixed(4)}</div>
+      <div class="card-sub">${SUMMARY_DATA.filter(d=>d.cost>0).length} paid models</div>
+    </div>
+    <div class="card card-tokens">
+      <div class="card-header">Total Tokens</div>
+      <div class="card-value">${fmt(totalTokens)}</div>
+      <div class="card-sub">${fmt(totalInput)} in · ${fmt(totalOutput)} out</div>
+    </div>
+    <div class="card card-sessions">
+      <div class="card-header">Total Sessions</div>
+      <div class="card-value">${totalSessions}</div>
+      <div class="card-sub">${new Set(SUMMARY_DATA.map(d=>d.model).filter(Boolean)).size} models</div>
+    </div>
+    <div class="card card-spend">
+      <div class="card-header">Avg Cost / Session</div>
+      <div class="card-value">$${avgCost.toFixed(4)}</div>
+      <div class="card-sub">$${(totalCost / Math.max(totalTokens, 1) * 1e6).toFixed(4)} / 1M tokens</div>
+    </div>
+  `;
+}
+
+// ── 2. Daily Cost Stacked Bar ──────────────────────────────────────
+function buildDailyChart() {
+  const { labels, datasets } = dailyByModel(DAILY_DATA);
+  const canvas = document.getElementById('dailyChart');
+  new Chart(canvas, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { boxWidth: 10, padding: 8, font: { size: 9 }, color: '#9b8ec4' }
+        },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          backgroundColor: 'rgba(10,10,15,0.9)',
+          borderColor: 'rgba(212,165,116,0.2)',
+          borderWidth: 1,
+          titleColor: '#d4a574',
+          bodyColor: '#d4c8b8',
+          callbacks: {
+            label: ctx => ctx.parsed.y > 0 ? ctx.dataset.label + ': $' + ctx.parsed.y.toFixed(4) : null
+          }
+        }
+      },
+      scales: {
+        x: {
+          stacked: true,
+          ticks: { color: '#9b8ec4', font: { size: 9 } },
+          grid: { color: 'rgba(212,165,116,0.04)' }
+        },
+        y: {
+          stacked: true,
+          title: { display: true, text: 'Cost (USD)', color: '#9b8ec4', font: { size: 9 } },
+          ticks: { color: '#9b8ec4', font: { size: 9 }, callback: v => '$' + v.toFixed(4) },
+          grid: { color: 'rgba(212,165,116,0.04)' }
+        }
+      }
+    }
+  });
+}
+
+// ── 3. Token Usage by Model (Horizontal Bar) ──────────────────────
+function buildTokenChart() {
+  const data = aggregateTokenByModel(SUMMARY_DATA).filter(d => d.input_tok + d.output_tok > 0);
+  const labels = data.map(d => d.model);
+  const inputData = data.map(d => d.input_tok);
+  const outputData = data.map(d => d.output_tok);
+
+  const canvas = document.getElementById('tokenChart');
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Input Tokens',
+          data: inputData,
+          backgroundColor: COLORS.lavenderBg,
+          borderColor: COLORS.lavender,
+          borderWidth: 1,
+          borderRadius: 2,
+        },
+        {
+          label: 'Output Tokens',
+          data: outputData,
+          backgroundColor: COLORS.goldBg,
+          borderColor: COLORS.gold,
+          borderWidth: 1,
+          borderRadius: 2,
+        }
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { boxWidth: 10, padding: 8, font: { size: 9 }, color: '#9b8ec4' }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(10,10,15,0.9)',
+          borderColor: 'rgba(212,165,116,0.2)',
+          borderWidth: 1,
+          titleColor: '#d4a574',
+          bodyColor: '#d4c8b8',
+          callbacks: {
+            label: ctx => ctx.dataset.label + ': ' + fmt(ctx.parsed.x)
+          }
+        }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: 'Tokens', color: '#9b8ec4', font: { size: 9 } },
+          ticks: { color: '#9b8ec4', font: { size: 8 }, callback: v => fmtCompact(v) },
+          grid: { color: 'rgba(212,165,116,0.04)' }
+        },
+        y: {
+          ticks: { color: '#d4a574', font: { size: 8 } },
+          grid: { display: false }
+        }
+      }
+    }
+  });
+}
+
+// ── 4. Source Breakdown (Donut) ────────────────────────────────────
+function buildSourceChart() {
+  const src = aggregateBySource(SUMMARY_DATA);
+  const labels = Object.keys(src);
+  const values = Object.values(src);
+  const colors = [COLORS.gold, COLORS.lavender, COLORS.rose, 'rgba(212,165,116,0.3)'];
+
+  const canvas = document.getElementById('sourceChart');
+  new Chart(canvas, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors.slice(0, labels.length),
+        borderColor: '#0a0a0f',
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      cutout: '65%',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { boxWidth: 10, padding: 6, font: { size: 9 }, color: '#9b8ec4' }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(10,10,15,0.9)',
+          borderColor: 'rgba(212,165,116,0.2)',
+          borderWidth: 1,
+          titleColor: '#d4a574',
+          bodyColor: '#d4c8b8',
+          callbacks: {
+            label: ctx => ctx.label + ': ' + ctx.parsed + ' sessions (' + (ctx.parsed / ctx.dataset.data.reduce((a,b)=>a+b,0)*100).toFixed(1) + '%)'
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── 5. Model Comparison Table ─────────────────────────────────────
+function buildTable() {
+  const data = aggregateByModel(SUMMARY_DATA).filter(d => d.input_tok + d.output_tok > 0);
+
+  let sortKey = 'cost';
+  let sortDir = -1;
+
+  function render() {
+    const sorted = [...data].sort((a,b) => {
+      const va = safeNum(a[sortKey]);
+      const vb = safeNum(b[sortKey]);
+      return (va - vb) * sortDir;
+    });
+
+    const thead = document.querySelector('#modelTable thead');
+    const tbody = document.querySelector('#modelTable tbody');
+
+    const cols = [
+      { key: 'model', label: 'Model' },
+      { key: 'sessions', label: 'Sessions' },
+      { key: 'input_tok', label: 'Input Tokens' },
+      { key: 'output_tok', label: 'Output Tokens' },
+      { key: 'cache_read', label: 'Cache Read' },
+      { key: 'cost', label: 'Cost (USD)' },
+      { key: 'cost_per_m', label: 'Cost/1M Tok' },
+      { key: 'avg_tok', label: 'Avg Tok/Session' },
+    ];
+
+    thead.innerHTML = '<tr>' + cols.map(c =>
+      `<th data-key="${c.key}" class="${sortKey===c.key?(sortDir<0?'desc':'asc'):''}">${c.label}</th>`
+    ).join('') + '</tr>';
+
+    tbody.innerHTML = sorted.map(d => {
+      const totalTok = safeNum(d.input_tok) + safeNum(d.output_tok);
+      const costPerM = totalTok > 0 ? safeNum(d.cost) / totalTok * 1e6 : 0;
+      const avgTok = d.sessions > 0 ? Math.round(totalTok / d.sessions) : 0;
+      return `<tr>
+        <td class="model-name">${d.model}</td>
+        <td class="num">${d.sessions}</td>
+        <td class="num">${fmt(d.input_tok)}</td>
+        <td class="num">${fmt(d.output_tok)}</td>
+        <td class="num">${fmt(d.cache_read)}</td>
+        <td class="num">${fmtMoney(safeNum(d.cost))}</td>
+        <td class="num">${costPerM > 0 ? '$' + costPerM.toFixed(4) : '—'}</td>
+        <td class="num">${fmt(avgTok)}</td>
+      </tr>`;
+    }).join('');
+
+    thead.querySelectorAll('th').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.key;
+        if (key === sortKey) sortDir *= -1;
+        else { sortKey = key; sortDir = -1; }
+        render();
+      });
+    });
+  }
+  render();
+}
+
+// ── 6. Activity Heatmap ────────────────────────────────────────────
+function buildHeatmap() {
+  const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const HOURS = Array.from({length:24}, (_,i) => String(i).padStart(2,'0'));
+
+  const map = {};
+  HEATMAP_DATA.forEach(d => {
+    const key = d.day_of_week + '|' + d.hour;
+    map[key] = d;
+  });
+
+  // Find max sessions for color scaling
+  const maxSessions = Math.max(...HEATMAP_DATA.map(d => d.sessions), 1);
+
+  let html = '<table class="heatmap-table"><thead><tr><th></th>';
+  HOURS.forEach(h => {
+    html += `<th>${h}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  DAYS.forEach((day, dow) => {
+    html += `<tr><td class="day-label">${day}</td>`;
+    HOURS.forEach(hour => {
+      const key = dow + '|' + hour;
+      const d = map[key];
+      const sessions = d ? d.sessions : 0;
+      const intensity = sessions / maxSessions;
+      const r = Math.round(10 + 120 * intensity);
+      const g = Math.round(10 + 80 * intensity);
+      const b = Math.round(15 + 70 * intensity);
+      const bg = d ? `rgb(${r},${g},${b})` : 'rgba(255,255,255,0.02)';
+      const tooltip = d ? `${sessions} session(s), ${fmtCompact(d.tokens)} tokens` : '';
+      html += `<td style="background:${bg}" title="${tooltip}" class="heatmap-cell">${sessions > 0 ? sessions : ''}</td>`;
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('heatmapContainer').innerHTML = html;
+}
+
+// ── Init ───────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  buildOverview();
+  buildDailyChart();
+  buildTokenChart();
+  buildSourceChart();
+  buildTable();
+  buildHeatmap();
+});
+</script>
+</body>
+</html>
